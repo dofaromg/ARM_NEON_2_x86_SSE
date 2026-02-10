@@ -15,3 +15,28 @@ _bin/
 *.hpp.orig
 *.h.orig
 *.cpp.orig
+
+# Node.js
+node_modules/
+npm-debug.log*
+.npm
+
+# Environment & Secrets
+.env
+.env.local
+.env.production
+*.pem
+*.key
+clickhouse_credentials*.txt
+*signature-key*
+
+# Docker
+docker-compose.override.yml
+
+# IDE
+.vscode/
+.idea/
+
+# Build output
+dist/
+build/

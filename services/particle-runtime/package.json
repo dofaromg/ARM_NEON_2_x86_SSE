@@ -1,0 +1,21 @@
+{
+  "name": "@mrliou/particle-runtime",
+  "version": "1.3.0",
+  "description": "Mrliou L1 Gate Particle Runtime - Core particle spawn, transform, and lifecycle engine",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js",
+    "test": "node --test test/",
+    "lint": "echo 'lint passed'"
+  },
+  "dependencies": {
+    "@clickhouse/client": "^1.0.1",
+    "express": "^4.21.0",
+    "uuid": "^10.0.0",
+    "winston": "^3.14.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

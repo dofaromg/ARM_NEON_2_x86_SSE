@@ -1,0 +1,88 @@
+{
+  "system": "mrliou-particle-system",
+  "version": "1.0.0",
+  "author": "Mr.Liou (dofaromg)",
+  "description": "Mrliou Particle System - 萬物邏輯結構",
+
+  "layers": {
+    "L0_seed": {
+      "name": "Seed Layer",
+      "description": "Origin seed corpus (Mr.liou.1B.SeedCorpus)",
+      "components": ["SeedOrigin.Persona.Core"]
+    },
+    "L1_gate": {
+      "name": "Gate Layer",
+      "description": "L1 Gate - Particle spawn and lifecycle control",
+      "components": ["ParticleRuntime", "Mrliou_L1_Gate"]
+    },
+    "L2_flow": {
+      "name": "Flow Layer",
+      "description": "FlowAgent pipeline and particle routing",
+      "components": ["FlowAgent", "SystemFusion.FusionSync"]
+    },
+    "L3_echo": {
+      "name": "Echo Layer",
+      "description": "EchoPersona translation and persona mapping",
+      "components": ["EchoPersona", "MemoryMerge.Adapter"]
+    },
+    "L4_world": {
+      "name": "World Layer",
+      "description": "World module - Particle Earth Navigation",
+      "components": ["ParticleEarthNav", "SemanticGlobeViewer", "StructuralEarthRuntime"]
+    }
+  },
+
+  "services": {
+    "particle-runtime": {
+      "port": 3000,
+      "version": "1.3.0",
+      "layer": "L1_gate"
+    },
+    "echo-persona": {
+      "port": 3001,
+      "version": "1.0.0",
+      "layer": "L3_echo"
+    },
+    "mcp-gateway": {
+      "port": 3002,
+      "version": "1.0.0",
+      "layer": "L2_flow"
+    },
+    "particle-chat": {
+      "port": 3003,
+      "version": "42.0.0",
+      "layer": "L4_world"
+    }
+  },
+
+  "personas": [
+    { "id": "seed", "bundle": "liou.seed.persona.bundle", "layer": "L0_seed" },
+    { "id": "echo", "bundle": "liou.echo.persona.bundle", "layer": "L3_echo" },
+    { "id": "future", "bundle": "liou.future.persona.bundle", "layer": "L2_flow" },
+    { "id": "dream", "bundle": "liou.dream.persona.bundle", "layer": "L4_world" },
+    { "id": "master", "bundle": "TeamSynergy.MasterPersona.flpkg", "layer": "L1_gate" }
+  ],
+
+  "plugins": [
+    "SourceRealityMap.flpkg",
+    "RoleMatch.Recommender.Core.flpkg",
+    "UniversalMediaModules.v1.flpkg",
+    "Seal.v1.flpkg",
+    "MemoryMerge.Adapter.flpkg",
+    "EchoPersona_TranslationModule.flpkg",
+    "ParticleEarthNav.NewWorld.flpkg"
+  ],
+
+  "storage": {
+    "database": "clickhouse",
+    "nas": "Mr.liou.NAS.v1",
+    "memoryVault": "MemoryVault_OneMachine",
+    "memoryLayer": "MemoryLayer_Index_VersionTree"
+  },
+
+  "security": {
+    "signing": "gnupg",
+    "signatureKey": "通行signature-key",
+    "sealModule": "Seal.v1.flpkg"
+  }
+}

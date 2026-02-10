@@ -1,0 +1,83 @@
+{
+  "family": "mrliou-particle-system",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "1024",
+  "memory": "2048",
+  "executionRoleArn": "arn:aws:iam::role/ecsTaskExecutionRole",
+  "containerDefinitions": [
+    {
+      "name": "particle-runtime",
+      "image": "${ECR_REGISTRY}/mrliou-particle:latest",
+      "command": ["particle-runtime"],
+      "portMappings": [
+        { "containerPort": 3000, "protocol": "tcp" }
+      ],
+      "environment": [
+        { "name": "NODE_ENV", "value": "production" },
+        { "name": "PORT", "value": "3000" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/mrliou-particle",
+          "awslogs-region": "ap-northeast-1",
+          "awslogs-stream-prefix": "particle-runtime"
+        }
+      },
+      "healthCheck": {
+        "command": ["CMD-SHELL", "curl -f http://localhost:3000/health || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 15
+      },
+      "essential": true
+    },
+    {
+      "name": "echo-persona",
+      "image": "${ECR_REGISTRY}/mrliou-particle:latest",
+      "command": ["echo-persona"],
+      "portMappings": [
+        { "containerPort": 3001, "protocol": "tcp" }
+      ],
+      "environment": [
+        { "name": "NODE_ENV", "value": "production" },
+        { "name": "PORT", "value": "3001" },
+        { "name": "PARTICLE_RUNTIME_URL", "value": "http://localhost:3000" }
+      ],
+      "essential": true
+    },
+    {
+      "name": "mcp-gateway",
+      "image": "${ECR_REGISTRY}/mrliou-particle:latest",
+      "command": ["mcp-gateway"],
+      "portMappings": [
+        { "containerPort": 3002, "protocol": "tcp" }
+      ],
+      "environment": [
+        { "name": "NODE_ENV", "value": "production" },
+        { "name": "PORT", "value": "3002" },
+        { "name": "PARTICLE_RUNTIME_URL", "value": "http://localhost:3000" },
+        { "name": "ECHO_PERSONA_URL", "value": "http://localhost:3001" }
+      ],
+      "essential": true
+    },
+    {
+      "name": "particle-chat",
+      "image": "${ECR_REGISTRY}/mrliou-particle:latest",
+      "command": ["particle-chat"],
+      "portMappings": [
+        { "containerPort": 3003, "protocol": "tcp" }
+      ],
+      "environment": [
+        { "name": "NODE_ENV", "value": "production" },
+        { "name": "PORT", "value": "3003" },
+        { "name": "PARTICLE_RUNTIME_URL", "value": "http://localhost:3000" },
+        { "name": "ECHO_PERSONA_URL", "value": "http://localhost:3001" },
+        { "name": "MCP_GATEWAY_URL", "value": "http://localhost:3002" }
+      ],
+      "essential": true
+    }
+  ]
+}
