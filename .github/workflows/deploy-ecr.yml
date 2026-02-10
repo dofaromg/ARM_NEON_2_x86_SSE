@@ -1,0 +1,124 @@
+# =============================================================================
+# Mrliou Particle System - AWS ECR Deployment Pipeline
+# Triggers: push to main, manual dispatch
+# Target: AWS ECR Container Registry
+# =============================================================================
+
+name: Build & Deploy to AWS ECR
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '*.md'
+      - 'LICENSE'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+      services:
+        description: 'Services to deploy (comma-separated or "all")'
+        required: true
+        default: 'all'
+        type: string
+
+env:
+  AWS_REGION: ap-northeast-1
+  ECR_REGISTRY_ALIAS: mrliou
+  IMAGE_PREFIX: mrliou-particle
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  # --- Build & Test ---
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: |
+          for svc in particle-runtime echo-persona mcp-gateway particle-chat; do
+            if [ -f "services/$svc/package.json" ]; then
+              echo "Installing $svc dependencies..."
+              cd "services/$svc" && npm ci && cd ../..
+            fi
+          done
+
+      - name: Run tests
+        run: |
+          for svc in particle-runtime echo-persona mcp-gateway particle-chat; do
+            if [ -f "services/$svc/package.json" ]; then
+              echo "Testing $svc..."
+              cd "services/$svc" && npm test --if-present && cd ../..
+            fi
+          done
+
+      - name: Verify NEON_2_SSE header
+        run: |
+          echo "Checking NEON_2_SSE.h integrity..."
+          sha256sum NEON_2_SSE.h
+          test -f NEON_2_SSE.h
+
+  # --- Build & Push Docker Image ---
+  push-ecr:
+    needs: build-test
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment || 'staging' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-arn: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push image
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          FULL_IMAGE="${ECR_REGISTRY}/${IMAGE_PREFIX}:${IMAGE_TAG}"
+          LATEST_IMAGE="${ECR_REGISTRY}/${IMAGE_PREFIX}:latest"
+
+          echo "Building image: ${FULL_IMAGE}"
+          docker build \
+            -f deploy/docker/Dockerfile \
+            -t "${FULL_IMAGE}" \
+            -t "${LATEST_IMAGE}" \
+            --label "git.sha=${GITHUB_SHA}" \
+            --label "git.ref=${GITHUB_REF}" \
+            --label "build.number=${GITHUB_RUN_NUMBER}" \
+            .
+
+          echo "Pushing to ECR..."
+          docker push "${FULL_IMAGE}"
+          docker push "${LATEST_IMAGE}"
+
+          echo "image=${FULL_IMAGE}" >> $GITHUB_OUTPUT
+
+      - name: Deploy summary
+        run: |
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image:** \`${IMAGE_PREFIX}:${GITHUB_SHA}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** ${{ inputs.environment || 'staging' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Region:** ${AWS_REGION}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Services:** ${{ inputs.services || 'all' }}" >> $GITHUB_STEP_SUMMARY

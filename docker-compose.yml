@@ -1,0 +1,137 @@
+# =============================================================================
+# Mrliou Particle System - Local Development Environment
+# docker-compose up -d
+# =============================================================================
+
+services:
+  # --- Core: Particle Runtime (L1 Gate) ---
+  particle-runtime:
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile
+    command: ["particle-runtime"]
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - CLICKHOUSE_HOST=clickhouse
+      - CLICKHOUSE_PORT=8123
+      - CLICKHOUSE_DB=mrliou_particles
+      - MCP_GATEWAY_URL=http://mcp-gateway:3002
+      - SEED_CORPUS_PATH=/data/seed-corpus
+      - LOG_LEVEL=debug
+    volumes:
+      - ./services/particle-runtime:/app/services/particle-runtime
+      - ./config:/app/config
+      - seed-data:/data/seed-corpus
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    networks:
+      - particle-net
+
+  # --- EchoPersona Translation Module ---
+  echo-persona:
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile
+    command: ["echo-persona"]
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - PARTICLE_RUNTIME_URL=http://particle-runtime:3000
+      - TRANSLATION_MODE=bidirectional
+      - PERSONA_SYNC_ENABLED=true
+      - LOG_LEVEL=debug
+    volumes:
+      - ./services/echo-persona:/app/services/echo-persona
+      - ./config:/app/config
+    depends_on:
+      - particle-runtime
+    networks:
+      - particle-net
+
+  # --- MCP Gateway (Model Context Protocol) ---
+  mcp-gateway:
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile
+    command: ["mcp-gateway"]
+    ports:
+      - "3002:3002"
+    environment:
+      - NODE_ENV=development
+      - PARTICLE_RUNTIME_URL=http://particle-runtime:3000
+      - ECHO_PERSONA_URL=http://echo-persona:3001
+      - MCP_TRANSPORT=streamable-http
+      - MCP_AUTH_ENABLED=true
+      - GPG_KEYRING_PATH=/app/.gnupg
+      - LOG_LEVEL=debug
+    volumes:
+      - ./services/mcp-gateway:/app/services/mcp-gateway
+      - ./config:/app/config
+      - gnupg-data:/app/.gnupg
+    depends_on:
+      - particle-runtime
+      - echo-persona
+    networks:
+      - particle-net
+
+  # --- Particle Chat v42 (Frontend + API) ---
+  particle-chat:
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile
+    command: ["particle-chat"]
+    ports:
+      - "3003:3003"
+    environment:
+      - NODE_ENV=development
+      - PARTICLE_RUNTIME_URL=http://particle-runtime:3000
+      - ECHO_PERSONA_URL=http://echo-persona:3001
+      - MCP_GATEWAY_URL=http://mcp-gateway:3002
+      - CLICKHOUSE_HOST=clickhouse
+      - CLICKHOUSE_PORT=8123
+      - CLICKHOUSE_DB=mrliou_particles
+      - CHAT_VERSION=v42
+      - LOG_LEVEL=debug
+    volumes:
+      - ./services/particle-chat:/app/services/particle-chat
+      - ./config:/app/config
+    depends_on:
+      - particle-runtime
+      - echo-persona
+      - mcp-gateway
+    networks:
+      - particle-net
+
+  # --- ClickHouse Database ---
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.3
+    ports:
+      - "8123:8123"   # HTTP interface
+      - "9000:9000"   # Native TCP
+    environment:
+      - CLICKHOUSE_DB=mrliou_particles
+      - CLICKHOUSE_USER=mrliou
+      - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD:-changeme}
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - ./config/clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - particle-net
+
+volumes:
+  clickhouse-data:
+  seed-data:
+  gnupg-data:
+
+networks:
+  particle-net:
+    driver: bridge
